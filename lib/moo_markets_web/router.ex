@@ -18,6 +18,12 @@ defmodule MooMarketsWeb.Router do
     pipe_through :browser
 
     get "/", PageController, :home
+
+    live "/credentials", CredentialsLive.Index, :index
+    live "/credentials/new", CredentialsLive.Index, :new
+    live "/credentials/:id/edit", CredentialsLive.Index, :edit
+    live "/credentials/:id", CredentialsLive.Show, :show
+    live "/credentials/:id/show/edit", CredentialsLive.Show, :edit
   end
 
   # Other scopes may use custom stacks.

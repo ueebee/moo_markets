@@ -1,0 +1,46 @@
+<.header>
+  認証情報の詳細
+  <:subtitle>J-Quants API の認証情報を表示します</:subtitle>
+  <:actions>
+    <.link patch={~p"/credentials/#{@credentials}/edit"} phx-click={JS.push_focus()}>
+      <.button>編集</.button>
+    </.link>
+  </:actions>
+</.header>
+
+<.list>
+  <:item title="メールアドレス"><%= @credentials.email %></:item>
+  <:item title="リフレッシュトークン">
+    <%= if @credentials.refresh_token do %>
+      <pre class="text-sm bg-gray-100 p-2 rounded"><%= @credentials.refresh_token %></pre>
+    <% end %>
+  </:item>
+  <:item title="リフレッシュトークン有効期限">
+    <%= if @credentials.refresh_token_expires_at do %>
+      <%= Calendar.strftime(@credentials.refresh_token_expires_at, "%Y-%m-%d %H:%M:%S") %>
+    <% end %>
+  </:item>
+  <:item title="IDトークン">
+    <%= if @credentials.id_token do %>
+      <pre class="text-sm bg-gray-100 p-2 rounded"><%= @credentials.id_token %></pre>
+    <% end %>
+  </:item>
+  <:item title="IDトークン有効期限">
+    <%= if @credentials.id_token_expires_at do %>
+      <%= Calendar.strftime(@credentials.id_token_expires_at, "%Y-%m-%d %H:%M:%S") %>
+    <% end %>
+  </:item>
+</.list>
+
+<.back navigate={~p"/credentials"}>認証情報一覧に戻る</.back>
+
+<.modal :if={@live_action == :edit} id="credentials-modal" show on_cancel={JS.patch(~p"/credentials/#{@credentials}")}>
+  <.live_component
+    module={MooMarketsWeb.CredentialsLive.FormComponent}
+    id={@credentials.id}
+    title={@page_title}
+    action={@live_action}
+    credentials={@credentials}
+    patch={~p"/credentials/#{@credentials}"}
+  />
+</.modal>

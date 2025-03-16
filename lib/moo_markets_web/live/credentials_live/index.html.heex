@@ -1,0 +1,51 @@
+<.header>
+  認証情報一覧
+  <:actions>
+    <.link patch={~p"/credentials/new"}>
+      <.button>新規登録</.button>
+    </.link>
+  </:actions>
+</.header>
+
+<.table
+  id="credentials"
+  rows={@streams.credentials_collection}
+  row_click={fn {_id, credentials} -> JS.navigate(~p"/credentials/#{credentials}") end}
+>
+  <:col :let={{_id, credentials}} label="メールアドレス"><%= credentials.email %></:col>
+  <:col :let={{_id, credentials}} label="リフレッシュトークン有効期限">
+    <%= if credentials.refresh_token_expires_at do %>
+      <%= Calendar.strftime(credentials.refresh_token_expires_at, "%Y-%m-%d %H:%M:%S") %>
+    <% end %>
+  </:col>
+  <:col :let={{_id, credentials}} label="IDトークン有効期限">
+    <%= if credentials.id_token_expires_at do %>
+      <%= Calendar.strftime(credentials.id_token_expires_at, "%Y-%m-%d %H:%M:%S") %>
+    <% end %>
+  </:col>
+  <:action :let={{_id, credentials}}>
+    <div class="sr-only">
+      <.link navigate={~p"/credentials/#{credentials}"}>表示</.link>
+    </div>
+    <.link patch={~p"/credentials/#{credentials}/edit"}>編集</.link>
+  </:action>
+  <:action :let={{id, credentials}}>
+    <.link
+      phx-click={JS.push("delete", value: %{id: credentials.id}) |> hide("##{id}")}
+      data-confirm="削除してもよろしいですか？"
+    >
+      削除
+    </.link>
+  </:action>
+</.table>
+
+<.modal :if={@live_action in [:new, :edit]} id="credentials-modal" show on_cancel={JS.patch(~p"/credentials")}>
+  <.live_component
+    module={MooMarketsWeb.CredentialsLive.FormComponent}
+    id={@credentials.id || :new}
+    title={@page_title}
+    action={@live_action}
+    credentials={@credentials}
+    patch={~p"/credentials"}
+  />
+</.modal>
