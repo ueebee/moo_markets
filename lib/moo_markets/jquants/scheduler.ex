@@ -7,8 +7,6 @@ defmodule MooMarkets.JQuants.Scheduler do
 
   alias MooMarkets.JQuants.{Client, ListedCompany}
 
-  @check_interval :timer.minutes(1)
-
   def start_link(_) do
     GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
   end
