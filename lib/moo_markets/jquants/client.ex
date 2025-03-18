@@ -7,8 +7,6 @@ defmodule MooMarkets.JQuants.Client do
 
   require Logger
 
-  alias MooMarkets.Auth.JQuantsApi
-
   plug Tesla.Middleware.BaseUrl, "https://api.jquants.com/v1"
   plug Tesla.Middleware.JSON
   plug Tesla.Middleware.Logger
