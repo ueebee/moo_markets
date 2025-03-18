@@ -17,7 +17,9 @@ defmodule MooMarkets.Application do
       # Start a worker by calling: MooMarkets.Worker.start_link(arg)
       # {MooMarkets.Worker, arg},
       # Start to serve requests, typically the last entry
-      MooMarketsWeb.Endpoint
+      MooMarketsWeb.Endpoint,
+      # Start the JQuants Scheduler
+      MooMarkets.JQuants.Scheduler
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html

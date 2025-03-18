@@ -55,7 +55,8 @@ defmodule MooMarkets.MixProject do
       {:tesla, "~> 1.14"},
       {:hackney, "~> 1.23"},
       {:timex, "~> 3.7"},
-      {:quantum, "~> 3.5"}
+      {:quantum, "~> 3.5"},
+      {:httpoison, "~> 2.0"}
     ]
   end
 
