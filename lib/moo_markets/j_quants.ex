@@ -10,6 +10,21 @@ defmodule MooMarkets.JQuants do
   alias MooMarkets.JQuants.Client
 
   @doc """
+  Returns the list of listed_companies.
+
+  ## Examples
+
+      iex> list_listed_companies()
+      [%ListedCompany{}, ...]
+
+  """
+  def list_listed_companies do
+    ListedCompany
+    |> order_by([l], asc: l.code)
+    |> Repo.all()
+  end
+
+  @doc """
   Returns the list of listed_companies with pagination.
 
   ## Examples
@@ -18,7 +33,7 @@ defmodule MooMarkets.JQuants do
       %{entries: [%ListedCompany{}, ...], total_entries: 1000, total_pages: 10}
 
   """
-  def list_listed_companies(params \\ %{}) do
+  def list_listed_companies(params) when is_map(params) do
     page = Map.get(params, :page, 1)
     per_page = Map.get(params, :per_page, 100)
     offset = (page - 1) * per_page
@@ -232,4 +247,20 @@ defmodule MooMarkets.JQuants do
         DateTime.utc_now() |> DateTime.truncate(:second)
     end
   end
+
+  @doc """
+  Gets a single listed_company by id.
+
+  Raises `Ecto.NoResultsError` if the Listed company does not exist.
+
+  ## Examples
+
+      iex> get_listed_company!(123)
+      %ListedCompany{}
+
+      iex> get_listed_company!(456)
+      ** (Ecto.NoResultsError)
+
+  """
+  def get_listed_company!(id), do: Repo.get!(ListedCompany, id)
 end
