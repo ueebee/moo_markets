@@ -7,6 +7,7 @@ defmodule MooMarkets.JQuants do
   alias MooMarkets.Repo
 
   alias MooMarkets.JQuants.ListedCompany
+  alias MooMarkets.JQuants.Client
 
   @doc """
   Returns the list of listed_companies with pagination.
@@ -162,5 +163,73 @@ defmodule MooMarkets.JQuants do
   """
   def change_listed_company(%ListedCompany{} = listed_company, attrs \\ %{}) do
     ListedCompany.changeset(listed_company, attrs)
+  end
+
+  @doc """
+  上場企業情報を取得して保存します
+  """
+  def fetch_and_save_listed_companies do
+    with {:ok, companies} <- Client.fetch_listed_companies() do
+      save_listed_companies(companies)
+    end
+  end
+
+  @doc """
+  上場企業情報を保存します
+  """
+  def save_listed_companies(companies) when is_list(companies) do
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+    companies
+    |> Enum.map(&transform_company_data/1)
+    |> Enum.map(&Map.merge(&1, %{inserted_at: now, updated_at: now}))
+    |> Enum.chunk_every(100)
+    |> Enum.reduce_while({:ok, []}, fn chunk, {:ok, acc} ->
+      case Repo.insert_all(ListedCompany, chunk, on_conflict: :replace_all, conflict_target: [:code]) do
+        {n, inserted} when is_integer(n) and n >= 0 -> {:cont, {:ok, inserted || []}}
+        error -> {:halt, error}
+      end
+    end)
+  end
+
+  defp transform_company_data(%{
+         "Code" => code,
+         "CompanyName" => company_name,
+         "CompanyNameEnglish" => company_name_english,
+         "Sector17Code" => sector17_code,
+         "Sector17CodeName" => sector17_code_name,
+         "Sector33Code" => sector33_code,
+         "Sector33CodeName" => sector33_code_name,
+         "ScaleCategory" => scale_category,
+         "MarketCode" => market_code,
+         "MarketCodeName" => market_code_name,
+         "MarginCode" => margin_code,
+         "MarginCodeName" => margin_code_name,
+         "Date" => date
+       }) do
+    %{
+      code: code,
+      company_name: company_name,
+      company_name_english: company_name_english,
+      sector17_code: sector17_code,
+      sector17_code_name: sector17_code_name,
+      sector33_code: sector33_code,
+      sector33_code_name: sector33_code_name,
+      scale_category: scale_category,
+      market_code: market_code,
+      market_code_name: market_code_name,
+      margin_code: margin_code,
+      margin_code_name: margin_code_name,
+      last_updated_at: parse_date(date)
+    }
+  end
+
+  defp parse_date(date_string) do
+    case Date.from_iso8601(date_string) do
+      {:ok, date} ->
+        NaiveDateTime.new!(date, ~T[00:00:00])
+        |> DateTime.from_naive!("Etc/UTC")
+      _ ->
+        DateTime.utc_now() |> DateTime.truncate(:second)
+    end
   end
 end
