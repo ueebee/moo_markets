@@ -198,7 +198,7 @@ defmodule MooMarkets.JQuants do
     |> Enum.map(&transform_company_data/1)
     |> Enum.map(&Map.merge(&1, %{inserted_at: now, updated_at: now}))
     |> Enum.chunk_every(100)
-    |> Enum.reduce_while({:ok, []}, fn chunk, {:ok, acc} ->
+    |> Enum.reduce_while({:ok, []}, fn chunk, {:ok, _acc} ->
       case Repo.insert_all(ListedCompany, chunk, on_conflict: :replace_all, conflict_target: [:code]) do
         {n, inserted} when is_integer(n) and n >= 0 -> {:cont, {:ok, inserted || []}}
         error -> {:halt, error}
