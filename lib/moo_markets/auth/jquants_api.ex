@@ -109,13 +109,13 @@ defmodule MooMarkets.Auth.JQuantsApi do
   """
   def ensure_active_credentials do
     case Auth.get_active_credentials() do
-      nil ->
+      {:error, :no_credentials} ->
         case Auth.get_credentials_needing_refresh() do
           [credentials | _] -> refresh_tokens(credentials)
           [] -> {:error, :no_credentials}
         end
 
-      credentials ->
+      {:ok, credentials} ->
         {:ok, credentials}
     end
   end

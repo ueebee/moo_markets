@@ -87,18 +87,6 @@ defmodule MooMarkets.TeslaMockTest do
   #   File.write!("mock_debug.log", "#{message}\n", [:append])
   # end
 
-  # 型情報を安全に取得
-  defp typeof(term) do
-    cond do
-      is_binary(term) -> "string"
-      is_map(term) -> "map#{if Map.has_key?(term, :__struct__), do: " (#{term.__struct__})", else: ""}"
-      is_list(term) -> "list"
-      is_number(term) -> "number"
-      is_atom(term) -> "atom"
-      true -> "other: #{inspect(term)}"
-    end
-  end
-
   # リクエストボディを適切に解析
   defp parse_body(body) when is_binary(body) do
     case Jason.decode(body) do

@@ -71,23 +71,17 @@ defmodule MooMarkets.Auth do
   end
 
   @doc """
-  Gets active credentials with valid tokens.
-  Returns nil if no valid credentials exist.
+  有効な認証情報を取得します
   """
   def get_active_credentials do
-    query =
-      from c in Credentials,
-        where: not is_nil(c.refresh_token) and not is_nil(c.id_token),
-        order_by: [desc: c.updated_at],
-        limit: 1
-
-    case Repo.one(query) do
-      nil -> nil
-      credentials ->
-        cond do
-          Credentials.refresh_token_expired?(credentials) -> nil
-          true -> credentials
-        end
+    Credentials
+    |> where([c], not is_nil(c.refresh_token) and not is_nil(c.id_token))
+    |> order_by([c], desc: c.updated_at)
+    |> limit(1)
+    |> Repo.one()
+    |> case do
+      nil -> {:error, :no_credentials}
+      credentials -> {:ok, credentials}
     end
   end
 

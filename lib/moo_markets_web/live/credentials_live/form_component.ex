@@ -2,6 +2,7 @@ defmodule MooMarketsWeb.CredentialsLive.FormComponent do
   use MooMarketsWeb, :live_component
 
   alias MooMarkets.Auth
+  alias MooMarkets.Auth.JQuantsApi
 
   @impl true
   def render(assigns) do
@@ -57,32 +58,52 @@ defmodule MooMarketsWeb.CredentialsLive.FormComponent do
   end
 
   defp save_credentials(socket, :edit, credentials_params) do
-    case Auth.update_credentials(socket.assigns.credentials, credentials_params) do
-      {:ok, credentials} ->
-        notify_parent({:saved, credentials})
+    with {:ok, refresh_result} <- JQuantsApi.get_refresh_token(credentials_params["email"], credentials_params["password"]),
+         {:ok, id_result} <- JQuantsApi.get_id_token(refresh_result.refresh_token),
+         {:ok, credentials} <- Auth.update_credentials(socket.assigns.credentials, credentials_params),
+         {:ok, credentials} <- Auth.update_credentials_tokens(credentials, Map.merge(refresh_result, id_result)) do
+      notify_parent({:saved, credentials})
 
+      {:noreply,
+       socket
+       |> put_flash(:info, "認証情報を更新しました")
+       |> push_patch(to: socket.assigns.patch)}
+    else
+      {:error, %{status: status, body: body}} ->
         {:noreply,
          socket
-         |> put_flash(:info, "認証情報を更新しました")
-         |> push_patch(to: socket.assigns.patch)}
-
+         |> put_flash(:error, "認証に失敗しました: #{status} #{inspect(body)}")}
       {:error, %Ecto.Changeset{} = changeset} ->
         {:noreply, assign_form(socket, changeset)}
+      {:error, reason} ->
+        {:noreply,
+         socket
+         |> put_flash(:error, "認証に失敗しました: #{inspect(reason)}")}
     end
   end
 
   defp save_credentials(socket, :new, credentials_params) do
-    case Auth.create_credentials(credentials_params) do
-      {:ok, credentials} ->
-        notify_parent({:saved, credentials})
+    with {:ok, refresh_result} <- JQuantsApi.get_refresh_token(credentials_params["email"], credentials_params["password"]),
+         {:ok, id_result} <- JQuantsApi.get_id_token(refresh_result.refresh_token),
+         {:ok, credentials} <- Auth.create_credentials(credentials_params),
+         {:ok, credentials} <- Auth.update_credentials_tokens(credentials, Map.merge(refresh_result, id_result)) do
+      notify_parent({:saved, credentials})
 
+      {:noreply,
+       socket
+       |> put_flash(:info, "認証情報を登録しました")
+       |> push_patch(to: socket.assigns.patch)}
+    else
+      {:error, %{status: status, body: body}} ->
         {:noreply,
          socket
-         |> put_flash(:info, "認証情報を登録しました")
-         |> push_patch(to: socket.assigns.patch)}
-
+         |> put_flash(:error, "認証に失敗しました: #{status} #{inspect(body)}")}
       {:error, %Ecto.Changeset{} = changeset} ->
         {:noreply, assign_form(socket, changeset)}
+      {:error, reason} ->
+        {:noreply,
+         socket
+         |> put_flash(:error, "認証に失敗しました: #{inspect(reason)}")}
     end
   end
 
