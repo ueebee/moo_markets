@@ -4,14 +4,9 @@ defmodule MooMarkets.Scheduler.Jobs.ListedCompaniesJob do
   """
   @behaviour MooMarkets.Scheduler.JobInterface
 
-  alias MooMarkets.JQuants
-
   @impl true
   def perform do
-    case JQuants.fetch_and_save_listed_companies() do
-      {:ok, _companies} -> :ok
-      {:error, reason} -> {:error, reason}
-    end
+    jquants_module().fetch_and_save_listed_companies()
   end
 
   @impl true
@@ -22,5 +17,9 @@ defmodule MooMarkets.Scheduler.Jobs.ListedCompaniesJob do
   @impl true
   def default_schedule do
     "0 6 * * *"  # 毎日午前6時に実行
+  end
+
+  defp jquants_module do
+    Application.get_env(:moo_markets, :jquants_module, MooMarkets.JQuants)
   end
 end
