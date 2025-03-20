@@ -292,3 +292,44 @@ UI/UXの改善
 エラーハンドリングの方針
 UIのデザイン方針（既存のデザインシステムとの整合性）
 これらの点について、具体的な実装方針を決めてから進めることをお勧めします。どの部分から着手すべきかご指示ください。
+
+
+---
+
+実装済みの項目：
+データベース設計
+✅ jobs テーブル
+✅ job_executions テーブル
+✅ 関連するEctoスキーマ
+モジュール構成
+✅ lib/moo_markets/scheduler/server.ex - スケジューラーサーバー
+✅ lib/moo_markets/scheduler/job_runner.ex - ジョブ実行管理
+✅ lib/moo_markets/scheduler/jobs/listed_companies_job.ex - 上場企業情報取得ジョブ
+ジョブ管理機能
+✅ ジョブの即時実行機能
+✅ ジョブの有効/無効切り替え
+✅ ジョブの実行履歴管理
+✅ ジョブの実行状況確認
+未実装の項目：
+APIエンドポイント
+❌ GET /api/scheduler/status
+❌ PUT /api/scheduler/enabled
+❌ GET /api/scheduler/jobs
+❌ GET /api/scheduler/jobs/:id
+❌ POST /api/scheduler/jobs/:id/run
+❌ GET /api/scheduler/jobs/:id/executions
+フロントエンド実装
+❌ スケジューラー状態表示
+❌ ジョブ一覧表示
+❌ ジョブ詳細表示
+❌ 実行履歴表示
+❌ 操作UI
+その他の機能
+❌ スケジュール解析と次回実行時刻計算の実装
+❌ エラー時のリトライ機能
+❌ ジョブ実行状況の定期的な更新
+次のステップとして、以下のいずれかに進むことができます：
+APIエンドポイントの実装
+LiveViewを使用したフロントエンドの実装
+スケジュール解析と次回実行時刻計算の実装
+どの方向で進めるべきかご指示ください。

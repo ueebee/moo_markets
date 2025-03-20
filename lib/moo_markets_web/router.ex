@@ -26,6 +26,12 @@ defmodule MooMarketsWeb.Router do
     live "/credentials/:id/show/edit", CredentialsLive.Show, :edit
   end
 
+  scope "/api", MooMarketsWeb do
+    pipe_through :api
+
+    get "/scheduler/status", SchedulerController, :status
+  end
+
   # Other scopes may use custom stacks.
   # scope "/api", MooMarketsWeb do
   #   pipe_through :api
