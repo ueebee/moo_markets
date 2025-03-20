@@ -253,7 +253,7 @@ defmodule MooMarkets.Scheduler.Server do
       result = JobRunner.run_job(job.job_type)
       send(self(), {:job_completed, job.id, result})
     catch
-      kind, reason ->
+      _kind, reason ->
         Logger.error("Job #{job.id} crashed: #{inspect(reason)}")
         send(self(), {:job_completed, job.id, {:error, reason}})
     end

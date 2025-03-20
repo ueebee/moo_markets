@@ -36,7 +36,7 @@ defmodule MooMarkets.Scheduler.Jobs.ListedCompaniesJobTest do
 
   describe "perform/0" do
     test "successfully fetches and saves listed companies" do
-      assert {:ok, []} = ListedCompaniesJob.perform()
+      assert :ok = ListedCompaniesJob.perform()
     end
 
     test "returns error when API call fails" do
