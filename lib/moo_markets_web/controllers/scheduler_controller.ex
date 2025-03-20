@@ -3,39 +3,16 @@ defmodule MooMarketsWeb.SchedulerController do
 
   alias MooMarkets.Scheduler.Server
 
-  def status(conn, _params) do
+  def get_status(conn, _params) do
     state = Server.get_state()
     render(conn, :status, state: state)
   end
 
-  def list_jobs(conn, _params) do
-    state = Server.get_state()
-    render(conn, :jobs, jobs: state.jobs)
-  end
-
-  def get_job(conn, %{"id" => id}) do
-    state = Server.get_state()
-    case Map.get(state.jobs, String.to_integer(id)) do
-      nil ->
-        conn
-        |> put_status(:not_found)
-        |> json(%{error: "Job not found"})
-
-      job ->
-        render(conn, :job, job: job)
-    end
-  end
-
-  def toggle_job_enabled(conn, %{"id" => id, "enabled" => enabled}) when is_boolean(enabled) do
-    case Server.toggle_job(String.to_integer(id), enabled) do
+  def toggle_enabled(conn, %{"enabled" => enabled}) do
+    case Server.toggle_job(1, enabled) do
       :ok ->
         state = Server.get_state()
         render(conn, :status, state: state)
-
-      {:error, :job_not_found} ->
-        conn
-        |> put_status(:not_found)
-        |> json(%{error: "Job not found"})
 
       {:error, reason} ->
         conn
@@ -44,9 +21,61 @@ defmodule MooMarketsWeb.SchedulerController do
     end
   end
 
-  def toggle_job_enabled(conn, _params) do
+  def get_jobs(conn, _params) do
+    state = Server.get_state()
+    render(conn, :jobs, jobs: state.jobs)
+  end
+
+  def get_job(conn, %{"id" => id}) do
+    case Integer.parse(id) do
+      {job_id, ""} ->
+        case Server.get_job(job_id) do
+          {:ok, job} ->
+            render(conn, :job, job: job)
+          {:error, :not_found} ->
+            conn
+            |> put_status(:not_found)
+            |> json(%{error: "Job not found"})
+        end
+      _ ->
+        conn
+        |> put_status(:bad_request)
+        |> json(%{error: "Invalid job ID"})
+    end
+  end
+
+  def run_job(conn, %{"id" => id}) do
+    state = Server.get_state()
+    case Map.get(state.jobs, id) do
+      nil ->
+        conn
+        |> put_status(:not_found)
+        |> json(%{error: "Job not found"})
+
+      job ->
+        if job.is_enabled do
+          if Map.has_key?(state.running_jobs, id) do
+            conn
+            |> put_status(:unprocessable_entity)
+            |> json(%{error: "Job is already running"})
+          else
+            Server.run_job(id)
+            conn
+            |> put_status(:accepted)
+            |> json(%{message: "Job execution started"})
+          end
+        else
+          conn
+          |> put_status(:unprocessable_entity)
+          |> json(%{error: "Job is disabled"})
+        end
+    end
+  end
+
+  def cleanup(conn, _params) do
+    Server.cleanup_running_jobs()
     conn
-    |> put_status(:bad_request)
-    |> json(%{error: "enabled parameter must be a boolean"})
+    |> put_status(:ok)
+    |> json(%{message: "Running jobs cleaned up"})
   end
 end

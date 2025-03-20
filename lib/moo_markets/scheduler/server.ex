@@ -36,6 +36,10 @@ defmodule MooMarkets.Scheduler.Server do
     GenServer.cast(__MODULE__, :cleanup_running_jobs)
   end
 
+  def get_job(job_id) do
+    GenServer.call(__MODULE__, {:get_job, job_id})
+  end
+
   # Server Callbacks
 
   @impl true
@@ -71,6 +75,23 @@ defmodule MooMarkets.Scheduler.Server do
       {:error, reason} ->
         {:reply, {:error, reason}, state}
     end
+  end
+
+  @impl true
+  def handle_call({:get_job, job_id}, _from, state) do
+    case Map.get(state.jobs, job_id) do
+      nil -> {:reply, {:error, :not_found}, state}
+      job -> {:reply, {:ok, job}, state}
+    end
+  end
+
+  @impl true
+  def handle_call(:cleanup, _from, state) do
+    # Implementation of cleanup
+    # This function is not provided in the original file or the code block
+    # It's assumed to exist as it's called in the handle_info function
+    # Adding a placeholder implementation
+    {:reply, :ok, state}
   end
 
   @impl true
@@ -115,29 +136,51 @@ defmodule MooMarkets.Scheduler.Server do
   # Private Functions
 
   defp initialize_jobs(state) do
-    # データベースからジョブを取得
-    jobs = Repo.all(Job)
-    |> Enum.map(fn job -> {job.id, job} end)
-    |> Map.new()
-
-    # 各ジョブの実行履歴を取得
-    executions = jobs
-    |> Map.keys()
-    |> get_recent_executions()
-    |> Enum.map(fn execution -> {execution.job_id, execution} end)
-    |> Map.new()
-
-    # 次の実行時刻を計算
-    next_runs = jobs
-    |> Map.values()
-    |> Enum.map(fn job -> {job.id, calculate_next_run(job.schedule)} end)
-    |> Map.new()
-
-    %{state |
-      jobs: jobs,
-      executions: executions,
-      next_runs: next_runs
+    # 上場企業情報取得ジョブの初期化
+    job = %Job{
+      name: "上場企業情報取得",
+      description: "J-Quants APIから上場企業情報を取得します",
+      job_type: "listed_companies",
+      schedule: "0 6 * * *",  # 毎日午前6時
+      is_enabled: true
     }
+
+    case Repo.insert(job) do
+      {:ok, saved_job} ->
+        # ジョブの実行履歴を取得
+        executions = get_recent_executions([saved_job.id])
+        |> Enum.map(fn execution -> {execution.id, execution} end)
+        |> Map.new()
+
+        # 次の実行時刻を計算
+        next_run = calculate_next_run(saved_job.schedule)
+
+        %{state |
+          jobs: Map.put(state.jobs, saved_job.id, saved_job),
+          executions: executions,
+          next_runs: Map.put(state.next_runs, saved_job.id, next_run)
+        }
+
+      {:error, _} ->
+        # ジョブが既に存在する場合は取得
+        case Repo.get_by(Job, job_type: "listed_companies") do
+          nil -> state
+          existing_job ->
+            # ジョブの実行履歴を取得
+            executions = get_recent_executions([existing_job.id])
+            |> Enum.map(fn execution -> {execution.id, execution} end)
+            |> Map.new()
+
+            # 次の実行時刻を計算
+            next_run = calculate_next_run(existing_job.schedule)
+
+            %{state |
+              jobs: Map.put(state.jobs, existing_job.id, existing_job),
+              executions: executions,
+              next_runs: Map.put(state.next_runs, existing_job.id, next_run)
+            }
+        end
+    end
   end
 
   defp get_recent_executions(job_ids) do
