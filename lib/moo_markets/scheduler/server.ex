@@ -24,8 +24,8 @@ defmodule MooMarkets.Scheduler.Server do
     GenServer.cast(__MODULE__, {:run_job, job_id})
   end
 
-  def toggle_job(job_id) do
-    GenServer.cast(__MODULE__, {:toggle_job, job_id})
+  def toggle_job(job_id, enabled) do
+    GenServer.call(__MODULE__, {:toggle_job, job_id, enabled})
   end
 
   @doc """
@@ -63,44 +63,25 @@ defmodule MooMarkets.Scheduler.Server do
   end
 
   @impl true
-  def handle_cast({:run_job, job_id}, state) do
-    case Repo.get(Job, job_id) do
-      nil ->
-        Logger.warning("Job not found: #{job_id}")
-        {:noreply, state}
+  def handle_call({:toggle_job, job_id, enabled}, _from, state) do
+    case toggle_job(state, job_id, enabled) do
+      {:ok, new_state} ->
+        {:reply, :ok, new_state}
 
-      job ->
-        if Map.has_key?(state.running_jobs, job_id) do
-          Logger.warning("Job is already running: #{job_id}")
-          {:noreply, state}
-        else
-          # ジョブを実行
-          Task.start(fn -> execute_job(job) end)
-          state = %{state | running_jobs: Map.put(state.running_jobs, job_id, DateTime.utc_now())}
-          {:noreply, state}
-        end
+      {:error, reason} ->
+        {:reply, {:error, reason}, state}
     end
   end
 
   @impl true
-  def handle_cast({:toggle_job, job_id}, state) do
-    case Repo.get(Job, job_id) do
-      nil ->
-        Logger.warning("Job not found: #{job_id}")
+  def handle_cast({:run_job, job_id}, state) do
+    case execute_job(state, job_id) do
+      {:ok, new_state} ->
+        {:noreply, new_state}
+
+      {:error, reason} ->
+        Logger.error("Failed to execute job #{job_id}: #{inspect(reason)}")
         {:noreply, state}
-
-      job ->
-        # ジョブの有効/無効を切り替え
-        case Repo.update(Job.changeset(job, %{is_enabled: !job.is_enabled})) do
-          {:ok, updated_job} ->
-            Logger.info("Job #{job_id} toggled to #{!job.is_enabled}")
-            state = %{state | jobs: Map.put(state.jobs, job_id, updated_job)}
-            {:noreply, state}
-
-          {:error, changeset} ->
-            Logger.error("Failed to toggle job #{job_id}: #{inspect(changeset.errors)}")
-            {:noreply, state}
-        end
     end
   end
 
@@ -127,17 +108,8 @@ defmodule MooMarkets.Scheduler.Server do
 
   @impl true
   def handle_info({:job_completed, job_id, result}, state) do
-    case result do
-      :ok ->
-        Logger.info("Job #{job_id} completed successfully")
-        state = update_job_state(state, job_id, "completed")
-        {:noreply, state}
-
-      {:error, reason} ->
-        Logger.error("Job #{job_id} failed: #{inspect(reason)}")
-        state = update_job_state(state, job_id, "failed", inspect(reason))
-        {:noreply, state}
-    end
+    new_state = update_job_execution(state, job_id, result)
+    {:noreply, new_state}
   end
 
   # Private Functions
@@ -176,34 +148,20 @@ defmodule MooMarkets.Scheduler.Server do
     )
   end
 
-  defp update_job_state(state, job_id, status, error_message \\ nil) do
-    now = DateTime.utc_now() |> DateTime.truncate(:second)
+  defp update_job_execution(state, job_id, result) do
+    # 実行中のジョブから削除
+    new_state = %{state | running_jobs: Map.delete(state.running_jobs, job_id)}
 
-    # ジョブの状態を更新
-    current_job = Map.get(state.jobs, job_id)
-    updated_job = current_job
-    |> Job.changeset(%{
-      last_run_at: now,
-      next_run_at: calculate_next_run(current_job.schedule)
-    })
-    |> Repo.update!()
-
-    # 実行履歴を更新
-    execution = %JobExecution{
-      job_id: job_id,
-      started_at: now,
-      completed_at: now,
-      status: status,
-      error_message: error_message
-    }
-    |> Repo.insert!()
-
-    # 状態を更新（running_jobsから必ず削除）
-    %{state |
-      jobs: Map.put(state.jobs, job_id, updated_job),
-      executions: Map.put(state.executions, job_id, execution),  # 最新の実行履歴を更新
-      running_jobs: Map.delete(state.running_jobs, job_id)  # 必ず削除
-    }
+    # ジョブの最終実行時刻を更新
+    case Map.get(new_state.jobs, job_id) do
+      nil -> new_state
+      job ->
+        case Repo.update(Job.changeset(job, %{last_run_at: DateTime.utc_now() |> DateTime.truncate(:second)})) do
+          {:ok, updated_job} ->
+            new_jobs = Map.put(new_state.jobs, job_id, updated_job)
+            %{new_state | jobs: new_jobs}
+        end
+    end
   end
 
   defp calculate_next_run(schedule) when is_binary(schedule) do
@@ -229,7 +187,7 @@ defmodule MooMarkets.Scheduler.Server do
       case Repo.get(Job, job_id) do
         nil -> acc
         job ->
-          Task.start(fn -> execute_job(job) end)
+          Task.start(fn -> execute_job(state, job_id) end)
           %{acc | running_jobs: Map.put(acc.running_jobs, job_id, DateTime.utc_now())}
       end
     end)
@@ -248,14 +206,61 @@ defmodule MooMarkets.Scheduler.Server do
     end)
   end
 
-  defp execute_job(job) do
-    try do
-      result = JobRunner.run_job(job.job_type)
-      send(self(), {:job_completed, job.id, result})
-    catch
-      _kind, reason ->
-        Logger.error("Job #{job.id} crashed: #{inspect(reason)}")
-        send(self(), {:job_completed, job.id, {:error, reason}})
+  defp execute_job(state, job_id) do
+    case Map.get(state.jobs, job_id) do
+      nil ->
+        {:error, :job_not_found}
+
+      job ->
+        if job.is_enabled do
+          # 実行中のジョブとしてマーク
+          new_state = %{state | running_jobs: Map.put(state.running_jobs, job_id, true)}
+
+          # ジョブ実行レコードを作成
+          execution = %JobExecution{
+            job_id: job_id,
+            started_at: DateTime.utc_now() |> DateTime.truncate(:second),
+            status: "running"
+          }
+
+          case Repo.insert(execution) do
+            {:ok, saved_execution} ->
+              # ジョブを非同期で実行
+              Task.start(fn ->
+                try do
+                  result = JobRunner.run_job(job.job_type)
+                  Process.send(self(), {:job_completed, job_id, result}, [])
+                catch
+                  kind, error ->
+                    Process.send(self(), {:job_completed, job_id, {:error, {kind, error}}}, [])
+                end
+              end)
+
+              {:ok, %{new_state | executions: Map.put(new_state.executions, saved_execution.id, saved_execution)}}
+
+            {:error, _} ->
+              {:error, :execution_creation_failed}
+          end
+        else
+          {:error, :job_disabled}
+        end
+    end
+  end
+
+  defp toggle_job(state, job_id, enabled) do
+    case Map.get(state.jobs, job_id) do
+      nil ->
+        {:error, :job_not_found}
+
+      job ->
+        case Repo.update(Job.changeset(job, %{is_enabled: enabled})) do
+          {:ok, updated_job} ->
+            new_jobs = Map.put(state.jobs, job_id, updated_job)
+            {:ok, %{state | jobs: new_jobs}}
+
+          {:error, _} ->
+            {:error, :update_failed}
+        end
     end
   end
 end

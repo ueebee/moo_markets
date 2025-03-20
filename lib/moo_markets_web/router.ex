@@ -30,6 +30,7 @@ defmodule MooMarketsWeb.Router do
     pipe_through :api
 
     get "/scheduler/status", SchedulerController, :status
+    put "/scheduler/jobs/:id/enabled", SchedulerController, :toggle_job_enabled
   end
 
   # Other scopes may use custom stacks.
