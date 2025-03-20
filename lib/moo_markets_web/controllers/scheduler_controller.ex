@@ -13,6 +13,19 @@ defmodule MooMarketsWeb.SchedulerController do
     render(conn, :jobs, jobs: state.jobs)
   end
 
+  def get_job(conn, %{"id" => id}) do
+    state = Server.get_state()
+    case Map.get(state.jobs, String.to_integer(id)) do
+      nil ->
+        conn
+        |> put_status(:not_found)
+        |> json(%{error: "Job not found"})
+
+      job ->
+        render(conn, :job, job: job)
+    end
+  end
+
   def toggle_job_enabled(conn, %{"id" => id, "enabled" => enabled}) when is_boolean(enabled) do
     case Server.toggle_job(String.to_integer(id), enabled) do
       :ok ->

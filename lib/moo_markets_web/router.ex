@@ -31,6 +31,7 @@ defmodule MooMarketsWeb.Router do
 
     get "/scheduler/status", SchedulerController, :status
     get "/scheduler/jobs", SchedulerController, :list_jobs
+    get "/scheduler/jobs/:id", SchedulerController, :get_job
     put "/scheduler/jobs/:id/enabled", SchedulerController, :toggle_job_enabled
   end
 
