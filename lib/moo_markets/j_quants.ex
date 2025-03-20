@@ -184,8 +184,12 @@ defmodule MooMarkets.JQuants do
   上場企業情報を取得して保存します
   """
   def fetch_and_save_listed_companies do
-    with {:ok, companies} <- Client.fetch_listed_companies() do
-      save_listed_companies(companies)
+    with {:ok, companies} <- Client.fetch_listed_companies(),
+         {:ok, _saved} <- save_listed_companies(companies) do
+      {:ok, companies}
+    else
+      {:error, reason} -> {:error, reason}
+      error -> {:error, error}
     end
   end
 

@@ -6,7 +6,13 @@ defmodule MooMarkets.Scheduler.Jobs.ListedCompaniesJob do
 
   @impl true
   def perform do
-    jquants_module().fetch_and_save_listed_companies()
+    case jquants_module().fetch_and_save_listed_companies() do
+      {:ok, _companies} -> :ok
+      {:ok, []} -> :ok  # 空のリストも成功として扱う
+      {:error, %{message: message, status: status}} -> {:error, "API Error: #{message} (Status: #{status})"}
+      {:error, reason} -> {:error, reason}
+      error -> {:error, "Unexpected error: #{inspect(error)}"}
+    end
   end
 
   @impl true

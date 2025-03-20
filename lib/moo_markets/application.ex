@@ -19,7 +19,9 @@ defmodule MooMarkets.Application do
       # Start to serve requests, typically the last entry
       MooMarketsWeb.Endpoint,
       # Start the JQuants Scheduler
-      MooMarkets.JQuants.Scheduler
+      MooMarkets.JQuants.Scheduler,
+      # Start the Scheduler Server
+      MooMarkets.Scheduler.Server
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html
