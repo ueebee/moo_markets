@@ -8,6 +8,11 @@ defmodule MooMarketsWeb.SchedulerController do
     render(conn, :status, state: state)
   end
 
+  def list_jobs(conn, _params) do
+    state = Server.get_state()
+    render(conn, :jobs, jobs: state.jobs)
+  end
+
   def toggle_job_enabled(conn, %{"id" => id, "enabled" => enabled}) when is_boolean(enabled) do
     case Server.toggle_job(String.to_integer(id), enabled) do
       :ok ->

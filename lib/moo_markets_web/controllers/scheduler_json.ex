@@ -7,6 +7,10 @@ defmodule MooMarketsWeb.SchedulerJSON do
     }
   end
 
+  def jobs(%{jobs: jobs}) do
+    %{jobs: render_jobs(jobs)}
+  end
+
   defp render_jobs(jobs) do
     Enum.map(jobs, fn {id, job} ->
       %{
