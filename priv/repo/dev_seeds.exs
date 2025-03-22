@@ -46,3 +46,21 @@ if email && password do
 else
   IO.puts("Warning: JQUANTS_EMAIL and JQUANTS_PASSWORD are not set in .env file.")
 end
+
+# Script for populating the database in development environment.
+
+alias MooMarkets.Scheduler.Job
+alias MooMarkets.Repo
+
+# 上場企業情報取得ジョブの初期化
+%Job{
+  name: "上場企業情報取得",
+  description: "J-Quants APIから上場企業情報を取得します",
+  job_type: "listed_companies",
+  schedule: "0 6 * * *",  # 毎日午前6時
+  is_enabled: true
+}
+|> Repo.insert!(
+  on_conflict: {:replace, [:name, :description, :schedule, :is_enabled]},
+  conflict_target: :job_type
+)

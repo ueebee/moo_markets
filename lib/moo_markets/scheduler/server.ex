@@ -52,8 +52,25 @@ defmodule MooMarkets.Scheduler.Server do
       running_jobs: %{}
     }
 
-    # ジョブの初期化
-    state = initialize_jobs(state)
+    # 既存のジョブを読み込む
+    jobs = MooMarkets.Repo.all(MooMarkets.Scheduler.Job)
+    jobs_map = jobs |> Enum.map(fn job -> {job.id, job} end) |> Map.new()
+
+    # 実行履歴を取得
+    executions = get_recent_executions(Map.keys(jobs_map))
+    |> Enum.map(fn execution -> {execution.id, execution} end)
+    |> Map.new()
+
+    # 次回実行時刻を計算
+    next_runs = jobs
+    |> Enum.map(fn job -> {job.id, calculate_next_run(job.schedule)} end)
+    |> Map.new()
+
+    state = %{state |
+      jobs: jobs_map,
+      executions: executions,
+      next_runs: next_runs
+    }
 
     # 定期的なジョブ状態の更新
     schedule_job_check()
@@ -134,71 +151,6 @@ defmodule MooMarkets.Scheduler.Server do
   end
 
   # Private Functions
-
-  defp initialize_jobs(state) do
-    # 上場企業情報取得ジョブの初期化
-    job = %Job{
-      name: "上場企業情報取得",
-      description: "J-Quants APIから上場企業情報を取得します",
-      job_type: "listed_companies",
-      schedule: "0 6 * * *",  # 毎日午前6時
-      is_enabled: true
-    }
-
-    # 既存のジョブを確認
-    case Repo.get_by(Job, job_type: "listed_companies") do
-      nil ->
-        # ジョブが存在しない場合は作成
-        case Repo.insert(job) do
-          {:ok, saved_job} ->
-            # ジョブの実行履歴を取得
-            executions = get_recent_executions([saved_job.id])
-            |> Enum.map(fn execution -> {execution.id, execution} end)
-            |> Map.new()
-
-            # 次の実行時刻を計算
-            next_run = calculate_next_run(saved_job.schedule)
-
-            %{state |
-              jobs: Map.put(state.jobs, saved_job.id, saved_job),
-              executions: executions,
-              next_runs: Map.put(state.next_runs, saved_job.id, next_run)
-            }
-
-          {:error, reason} ->
-            Logger.error("Failed to create listed companies job: #{inspect(reason)}")
-            state
-        end
-
-      existing_job ->
-        # ジョブが既に存在する場合は更新
-        case Repo.update(Job.changeset(existing_job, %{
-          name: job.name,
-          description: job.description,
-          schedule: job.schedule,
-          is_enabled: job.is_enabled
-        })) do
-          {:ok, updated_job} ->
-            # ジョブの実行履歴を取得
-            executions = get_recent_executions([updated_job.id])
-            |> Enum.map(fn execution -> {execution.id, execution} end)
-            |> Map.new()
-
-            # 次の実行時刻を計算
-            next_run = calculate_next_run(updated_job.schedule)
-
-            %{state |
-              jobs: Map.put(state.jobs, updated_job.id, updated_job),
-              executions: executions,
-              next_runs: Map.put(state.next_runs, updated_job.id, next_run)
-            }
-
-          {:error, reason} ->
-            Logger.error("Failed to update listed companies job: #{inspect(reason)}")
-            state
-        end
-    end
-  end
 
   defp get_recent_executions(job_ids) do
     Repo.all(
