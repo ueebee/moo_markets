@@ -133,7 +133,7 @@ defmodule MooMarkets.Scheduler.Server do
   def handle_info(:check_jobs, state) do
     # 次の実行時刻をチェック
     now = DateTime.utc_now()
-    state = check_and_run_due_jobs(state, now)
+    state = check_and_run_due_jobs(state)
 
     # 実行中のジョブをチェック
     state = check_running_jobs(state)
@@ -177,9 +177,24 @@ defmodule MooMarkets.Scheduler.Server do
   end
 
   defp calculate_next_run(schedule) when is_binary(schedule) do
-    # 一時的な実装: スケジュールの解析は後で実装
-    # 現在は1時間後に設定
-    DateTime.add(DateTime.utc_now(), 3600)
+    try do
+      # scheduleからcron式を解析
+      case Crontab.CronExpression.Parser.parse(schedule) do
+        {:ok, cron_expr} ->
+          # 現在時刻から次の実行時刻を計算
+          now = DateTime.utc_now() |> DateTime.to_naive()
+          Crontab.Scheduler.get_next_run_date!(cron_expr, now)
+          |> DateTime.from_naive!("Etc/UTC")
+
+        {:error, reason} ->
+          Logger.error("Failed to parse cron expression: #{schedule}, reason: #{inspect(reason)}")
+          nil
+      end
+    rescue
+      e ->
+        Logger.error("Error calculating next run time: #{inspect(e)}")
+        nil
+    end
   end
 
   defp calculate_next_run(_), do: nil
@@ -188,21 +203,38 @@ defmodule MooMarkets.Scheduler.Server do
     Process.send_after(self(), :check_jobs, :timer.minutes(1))
   end
 
-  defp check_and_run_due_jobs(state, now) do
-    state.jobs
-    |> Enum.filter(fn {_id, job} ->
-      job.is_enabled &&
-      Map.has_key?(state.next_runs, job.id) &&
-      DateTime.compare(Map.get(state.next_runs, job.id), now) == :lt
-    end)
-    |> Enum.reduce(state, fn {job_id, _job}, acc ->
-      case Repo.get(Job, job_id) do
-        nil -> acc
-        job ->
-          Task.start(fn -> execute_job(state, job_id) end)
-          %{acc | running_jobs: Map.put(acc.running_jobs, job_id, DateTime.utc_now())}
-      end
-    end)
+  defp check_and_run_due_jobs(state) do
+    now = DateTime.utc_now()
+
+    # Filter and run due jobs
+    due_jobs =
+      state.jobs
+      |> Enum.filter(fn {_id, job} ->
+        job.is_enabled &&
+        Map.has_key?(state.next_runs, job.id) &&
+        DateTime.compare(Map.get(state.next_runs, job.id), now) == :lt
+      end)
+
+    # Run jobs and update last_run_at
+    new_jobs =
+      Enum.reduce(due_jobs, state.jobs, fn {job_id, job}, acc ->
+        case execute_job(state, job_id) do
+          :ok ->
+            # Update last_run_at
+            Map.update!(acc, job_id, fn j -> %{j | last_run_at: now} end)
+          _ ->
+            acc
+        end
+      end)
+
+    # Recalculate next_runs for executed jobs
+    new_next_runs =
+      Enum.reduce(due_jobs, state.next_runs, fn {job_id, job}, acc ->
+        next_run = calculate_next_run(job.schedule)
+        Map.put(acc, job_id, next_run)
+      end)
+
+    %{state | jobs: new_jobs, next_runs: new_next_runs}
   end
 
   defp check_running_jobs(state) do

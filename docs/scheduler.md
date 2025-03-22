@@ -333,3 +333,78 @@ APIエンドポイントの実装
 LiveViewを使用したフロントエンドの実装
 スケジュール解析と次回実行時刻計算の実装
 どの方向で進めるべきかご指示ください。
+
+---
+
+### 🔍 動作確認手順
+
+#### 1. スケジューラーの起動確認
+```elixir
+# IExシェルを起動
+iex -S mix phx.server
+
+# スケジューラーの状態を確認
+MooMarkets.Scheduler.Server.get_state()
+```
+
+#### 2. ジョブの設定確認
+```elixir
+# データベースにジョブが存在することを確認
+MooMarkets.Repo.all(MooMarkets.Scheduler.Job)
+
+# 必要に応じて、ジョブを更新
+job = MooMarkets.Repo.get_by!(MooMarkets.Scheduler.Job, job_type: "listed_companies")
+job_params = %{
+  name: "上場企業情報取得",
+  description: "J-Quants APIから上場企業情報を取得",
+  schedule: "*/1 * * * *",  # 毎分実行（テスト用）
+  is_enabled: true
+}
+job
+|> MooMarkets.Scheduler.Job.changeset(job_params)
+|> MooMarkets.Repo.update()
+
+# サーバーを再起動して新しいスケジュールを反映
+Supervisor.terminate_child(MooMarkets.Supervisor, MooMarkets.Scheduler.Server)
+Supervisor.restart_child(MooMarkets.Supervisor, MooMarkets.Scheduler.Server)
+
+# 状態を確認して再起動完了を確認
+MooMarkets.Scheduler.Server.get_state()
+```
+
+#### 3. ジョブの実行確認
+```elixir
+# ジョブIDを指定して即時実行
+job = MooMarkets.Repo.get_by!(MooMarkets.Scheduler.Job, job_type: "listed_companies")
+MooMarkets.Scheduler.Server.run_job(job.id)
+
+# 実行状態の確認
+state = MooMarkets.Scheduler.Server.get_state()
+IO.inspect(state.running_jobs, label: "Running Jobs")
+IO.inspect(state.next_runs, label: "Next Runs")
+
+# 実行履歴の確認
+MooMarkets.Repo.all(MooMarkets.Scheduler.JobExecution)
+```
+
+#### 4. スケジュール実行の確認
+- ジョブの`schedule`に設定された時刻になると自動実行されます
+- `next_runs`の値と実際の実行時刻を比較して、正しくスケジューリングされているか確認します
+- 実行履歴（`job_executions`テーブル）に記録が追加されることを確認します
+
+#### 5. エラーハンドリングの確認
+```elixir
+# 実行中のジョブをクリーンアップ（必要な場合）
+MooMarkets.Scheduler.Server.cleanup_running_jobs()
+
+# ジョブの有効/無効を切り替え
+job_id = job.id
+MooMarkets.Scheduler.Server.toggle_job(job_id, false)  # 無効化
+MooMarkets.Scheduler.Server.toggle_job(job_id, true)   # 有効化
+```
+
+#### 6. トラブルシューティング
+- ログを確認して、エラーメッセージや警告がないか確認
+- 長時間実行されているジョブがないか確認（1時間以上実行中のジョブは警告ログが出力されます）
+- `next_runs`の値が更新されない場合は、`schedule`のcron式が正しいか確認
+- ジョブが実行されない場合は、`is_enabled`の値とスケジュールを確認
