@@ -45,30 +45,37 @@ defmodule MooMarketsWeb.SchedulerController do
   end
 
   def run_job(conn, %{"id" => id}) do
-    state = Server.get_state()
-    case Map.get(state.jobs, id) do
-      nil ->
-        conn
-        |> put_status(:not_found)
-        |> json(%{error: "Job not found"})
+    case Integer.parse(id) do
+      {job_id, ""} ->
+        state = Server.get_state()
+        case Map.get(state.jobs, job_id) do
+          nil ->
+            conn
+            |> put_status(:not_found)
+            |> json(%{error: "Job not found"})
 
-      job ->
-        if job.is_enabled do
-          if Map.has_key?(state.running_jobs, id) do
-            conn
-            |> put_status(:unprocessable_entity)
-            |> json(%{error: "Job is already running"})
-          else
-            Server.run_job(id)
-            conn
-            |> put_status(:accepted)
-            |> json(%{message: "Job execution started"})
-          end
-        else
-          conn
-          |> put_status(:unprocessable_entity)
-          |> json(%{error: "Job is disabled"})
+          job ->
+            if job.is_enabled do
+              if Map.has_key?(state.running_jobs, job_id) do
+                conn
+                |> put_status(:unprocessable_entity)
+                |> json(%{error: "Job is already running"})
+              else
+                Server.run_job(job_id)
+                conn
+                |> put_status(:accepted)
+                |> json(%{message: "Job execution started"})
+              end
+            else
+              conn
+              |> put_status(:unprocessable_entity)
+              |> json(%{error: "Job is disabled"})
+            end
         end
+      _ ->
+        conn
+        |> put_status(:bad_request)
+        |> json(%{error: "Invalid job ID"})
     end
   end
 
