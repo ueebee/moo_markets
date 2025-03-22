@@ -2,6 +2,10 @@ defmodule MooMarketsWeb.SchedulerController do
   use MooMarketsWeb, :controller
 
   alias MooMarkets.Scheduler.Server
+  alias MooMarkets.Scheduler.Job
+  alias MooMarkets.Scheduler.JobExecution
+  alias MooMarkets.Repo
+  import Ecto.Query
 
   def get_status(conn, _params) do
     state = Server.get_state()
@@ -91,5 +95,33 @@ defmodule MooMarketsWeb.SchedulerController do
     conn
     |> put_status(:ok)
     |> json(%{message: "Running jobs cleaned up"})
+  end
+
+  def get_job_executions(conn, %{"id" => id}) do
+    case Integer.parse(id) do
+      {job_id, ""} ->
+        case Repo.get(Job, job_id) do
+          nil ->
+            conn
+            |> put_status(:not_found)
+            |> json(%{error: "Job not found"})
+
+          _job ->
+            executions =
+              from(e in JobExecution,
+                where: e.job_id == ^job_id,
+                order_by: [desc: e.started_at],
+                limit: 10
+              )
+              |> Repo.all()
+
+            render(conn, :executions, executions: executions)
+        end
+
+      _ ->
+        conn
+        |> put_status(:bad_request)
+        |> json(%{error: "Invalid job ID"})
+    end
   end
 end

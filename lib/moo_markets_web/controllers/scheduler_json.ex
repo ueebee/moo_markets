@@ -24,6 +24,21 @@ defmodule MooMarketsWeb.SchedulerJSON do
     }
   end
 
+  def executions(%{executions: executions}) do
+    %{
+      executions: Enum.map(executions, fn execution ->
+        %{
+          id: execution.id,
+          job_id: execution.job_id,
+          started_at: execution.started_at,
+          completed_at: execution.completed_at,
+          status: execution.status,
+          error_message: execution.error_message
+        }
+      end)
+    }
+  end
+
   defp render_jobs(jobs) do
     Enum.map(jobs, fn {id, job} ->
       %{
