@@ -24,6 +24,8 @@ defmodule MooMarketsWeb.Router do
     live "/credentials/:id/edit", CredentialsLive.Index, :edit
     live "/credentials/:id", CredentialsLive.Show, :show
     live "/credentials/:id/show/edit", CredentialsLive.Show, :edit
+
+    live "/scheduler", SchedulerLive.Index, :index
   end
 
   scope "/api", MooMarketsWeb do

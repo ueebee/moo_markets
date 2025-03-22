@@ -1,0 +1,69 @@
+<div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10">
+  <div class="sm:flex sm:items-center">
+    <div class="sm:flex-auto">
+      <h1 class="text-xl font-semibold text-gray-900">ジョブ一覧</h1>
+      <p class="mt-2 text-sm text-gray-700">スケジューラーで管理されているジョブの一覧です。</p>
+    </div>
+  </div>
+
+  <div class="mt-8 flow-root">
+    <div class="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
+      <div class="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
+        <table class="min-w-full divide-y divide-gray-300">
+          <thead>
+            <tr>
+              <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-0">名前</th>
+              <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">説明</th>
+              <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">スケジュール</th>
+              <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">最終実行</th>
+              <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">次回実行</th>
+              <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">状態</th>
+              <th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-0">
+                <span class="sr-only">操作</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-200">
+            <%= for {id, job} <- @jobs do %>
+              <tr>
+                <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-0">
+                  <%= job.name %>
+                </td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                  <%= job.description %>
+                </td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                  <%= job.schedule %>
+                </td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                  <%= if job.last_run_at, do: Calendar.strftime(job.last_run_at, "%Y-%m-%d %H:%M:%S"), else: "-" %>
+                </td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                  <%= if job.next_run_at, do: Calendar.strftime(job.next_run_at, "%Y-%m-%d %H:%M:%S"), else: "-" %>
+                </td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm">
+                  <span class={"inline-flex items-center rounded-md px-2 py-1 text-xs font-medium #{if job.is_enabled, do: "bg-green-50 text-green-700", else: "bg-red-50 text-red-700"}"}>
+                    <%= if job.is_enabled, do: "有効", else: "無効" %>
+                  </span>
+                </td>
+                <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-0">
+                  <div class="flex justify-end gap-2">
+                    <button phx-click="toggle_job" phx-value-id={id} phx-value-enabled={!job.is_enabled}
+                      class={"inline-flex items-center rounded-md px-2.5 py-1.5 text-sm font-semibold shadow-sm #{if job.is_enabled, do: "bg-red-50 text-red-700 hover:bg-red-100", else: "bg-green-50 text-green-700 hover:bg-green-100"}"}>
+                      <%= if job.is_enabled, do: "無効化", else: "有効化" %>
+                    </button>
+                    <button phx-click="run_job" phx-value-id={id}
+                      class={"inline-flex items-center rounded-md bg-indigo-50 px-2.5 py-1.5 text-sm font-semibold text-indigo-700 shadow-sm hover:bg-indigo-100 #{if !job.is_enabled, do: "opacity-50 cursor-not-allowed"}"} 
+                      disabled={!job.is_enabled}>
+                      実行
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div> 
