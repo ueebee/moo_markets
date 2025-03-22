@@ -30,13 +30,11 @@ defmodule MooMarketsWeb.SchedulerLive.Index do
   @impl true
   def handle_event("run_job", %{"id" => id}, socket) do
     case MooMarkets.Scheduler.Server.run_job(String.to_integer(id)) do
-      {:ok, _} ->
+      :ok ->
         {:noreply,
           socket
           |> put_flash(:info, "ジョブを実行開始しました")
           |> assign(jobs: fetch_jobs())}
-      {:error, reason} ->
-        {:noreply, put_flash(socket, :error, "ジョブの実行に失敗しました: #{inspect(reason)}")}
     end
   end
 

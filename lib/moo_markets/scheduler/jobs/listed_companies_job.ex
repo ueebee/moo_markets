@@ -9,16 +9,16 @@ defmodule MooMarkets.Scheduler.Jobs.ListedCompaniesJob do
   def perform do
     Logger.info("Starting ListedCompaniesJob.perform()")
     case jquants_module().fetch_and_save_listed_companies() do
-      {:ok, _companies} = result ->
-        Logger.info("ListedCompaniesJob completed successfully")
-        :ok
-      {:ok, []} = result ->
+      {:ok, []} = _result ->
         Logger.info("ListedCompaniesJob completed successfully (no companies)")
         :ok
-      {:error, %{message: message, status: status}} = error ->
+      {:ok, _companies} = _result ->
+        Logger.info("ListedCompaniesJob completed successfully")
+        :ok
+      {:error, %{message: message, status: status}} = _error ->
         Logger.error("ListedCompaniesJob failed: API Error: #{message} (Status: #{status})")
         {:error, "API Error: #{message} (Status: #{status})"}
-      {:error, reason} = error ->
+      {:error, reason} = _error ->
         Logger.error("ListedCompaniesJob failed: #{inspect(reason)}")
         {:error, reason}
       error ->

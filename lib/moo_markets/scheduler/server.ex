@@ -132,7 +132,6 @@ defmodule MooMarkets.Scheduler.Server do
   @impl true
   def handle_info(:check_jobs, state) do
     # 次の実行時刻をチェック
-    now = DateTime.utc_now()
     state = check_and_run_due_jobs(state)
 
     # 実行中のジョブをチェック
@@ -160,7 +159,7 @@ defmodule MooMarkets.Scheduler.Server do
     )
   end
 
-  defp update_job_execution(state, job_id, result) do
+  defp update_job_execution(state, job_id, _result) do
     # 実行中のジョブから削除
     new_state = %{state | running_jobs: Map.delete(state.running_jobs, job_id)}
 
@@ -217,12 +216,12 @@ defmodule MooMarkets.Scheduler.Server do
 
     # Run jobs and update last_run_at
     new_jobs =
-      Enum.reduce(due_jobs, state.jobs, fn {job_id, job}, acc ->
+      Enum.reduce(due_jobs, state.jobs, fn {job_id, _job}, acc ->
         case execute_job(state, job_id) do
-          :ok ->
+          {:ok, _new_state} ->
             # Update last_run_at
             Map.update!(acc, job_id, fn j -> %{j | last_run_at: now} end)
-          _ ->
+          {:error, _reason} ->
             acc
         end
       end)

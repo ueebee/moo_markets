@@ -33,7 +33,7 @@ defmodule MooMarkets.Scheduler.JobRunner do
 
             # 実行中のジョブをチェック
             if has_running_execution?(job.id) do
-              Logger.warn("Job #{job.id} is already running")
+              Logger.warning("Job #{job.id} is already running")
               {:error, :job_already_running}
             else
               execution = create_execution(job.id, now)
