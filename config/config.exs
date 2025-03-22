@@ -61,6 +61,11 @@ config :logger, :console,
 # Use Jason for JSON parsing in Phoenix
 config :phoenix, :json_library, Jason
 
+# Configure JQuants module for testing
+if config_env() == :test do
+  config :moo_markets, :jquants_module, MooMarkets.Scheduler.Jobs.ListedCompaniesJobTest.MockJQuants
+end
+
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.
 import_config "#{config_env()}.exs"

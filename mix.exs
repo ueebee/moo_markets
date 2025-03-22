@@ -56,7 +56,8 @@ defmodule MooMarkets.MixProject do
       {:hackney, "~> 1.23"},
       {:timex, "~> 3.7"},
       {:quantum, "~> 3.5"},
-      {:httpoison, "~> 2.0"}
+      {:httpoison, "~> 2.0"},
+      {:dotenv, "~> 3.0.0", only: [:dev, :test]}
     ]
   end
 
@@ -71,6 +72,8 @@ defmodule MooMarkets.MixProject do
       setup: ["deps.get", "ecto.setup", "assets.setup", "assets.build"],
       "ecto.setup": ["ecto.create", "ecto.migrate", "run priv/repo/seeds.exs"],
       "ecto.reset": ["ecto.drop", "ecto.setup"],
+      "dev.setup": ["ecto.setup", "run priv/repo/dev_seeds.exs"],
+      "dev.reset": ["ecto.drop", "dev.setup"],
       test: ["ecto.create --quiet", "ecto.migrate --quiet", "test"],
       "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
       "assets.build": ["tailwind default", "esbuild default"],
