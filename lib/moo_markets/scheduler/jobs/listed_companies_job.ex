@@ -3,15 +3,27 @@ defmodule MooMarkets.Scheduler.Jobs.ListedCompaniesJob do
   Job that fetches listed companies information from J-Quants API.
   """
   @behaviour MooMarkets.Scheduler.JobInterface
+  require Logger
 
   @impl true
   def perform do
+    Logger.info("Starting ListedCompaniesJob.perform()")
     case jquants_module().fetch_and_save_listed_companies() do
-      {:ok, _companies} -> :ok
-      {:ok, []} -> :ok  # 空のリストも成功として扱う
-      {:error, %{message: message, status: status}} -> {:error, "API Error: #{message} (Status: #{status})"}
-      {:error, reason} -> {:error, reason}
-      error -> {:error, "Unexpected error: #{inspect(error)}"}
+      {:ok, _companies} = result ->
+        Logger.info("ListedCompaniesJob completed successfully")
+        :ok
+      {:ok, []} = result ->
+        Logger.info("ListedCompaniesJob completed successfully (no companies)")
+        :ok
+      {:error, %{message: message, status: status}} = error ->
+        Logger.error("ListedCompaniesJob failed: API Error: #{message} (Status: #{status})")
+        {:error, "API Error: #{message} (Status: #{status})"}
+      {:error, reason} = error ->
+        Logger.error("ListedCompaniesJob failed: #{inspect(reason)}")
+        {:error, reason}
+      error ->
+        Logger.error("ListedCompaniesJob failed with unexpected error: #{inspect(error)}")
+        {:error, "Unexpected error: #{inspect(error)}"}
     end
   end
 

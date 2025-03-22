@@ -145,40 +145,57 @@ defmodule MooMarkets.Scheduler.Server do
       is_enabled: true
     }
 
-    case Repo.insert(job) do
-      {:ok, saved_job} ->
-        # ジョブの実行履歴を取得
-        executions = get_recent_executions([saved_job.id])
-        |> Enum.map(fn execution -> {execution.id, execution} end)
-        |> Map.new()
-
-        # 次の実行時刻を計算
-        next_run = calculate_next_run(saved_job.schedule)
-
-        %{state |
-          jobs: Map.put(state.jobs, saved_job.id, saved_job),
-          executions: executions,
-          next_runs: Map.put(state.next_runs, saved_job.id, next_run)
-        }
-
-      {:error, _} ->
-        # ジョブが既に存在する場合は取得
-        case Repo.get_by(Job, job_type: "listed_companies") do
-          nil -> state
-          existing_job ->
+    # 既存のジョブを確認
+    case Repo.get_by(Job, job_type: "listed_companies") do
+      nil ->
+        # ジョブが存在しない場合は作成
+        case Repo.insert(job) do
+          {:ok, saved_job} ->
             # ジョブの実行履歴を取得
-            executions = get_recent_executions([existing_job.id])
+            executions = get_recent_executions([saved_job.id])
             |> Enum.map(fn execution -> {execution.id, execution} end)
             |> Map.new()
 
             # 次の実行時刻を計算
-            next_run = calculate_next_run(existing_job.schedule)
+            next_run = calculate_next_run(saved_job.schedule)
 
             %{state |
-              jobs: Map.put(state.jobs, existing_job.id, existing_job),
+              jobs: Map.put(state.jobs, saved_job.id, saved_job),
               executions: executions,
-              next_runs: Map.put(state.next_runs, existing_job.id, next_run)
+              next_runs: Map.put(state.next_runs, saved_job.id, next_run)
             }
+
+          {:error, reason} ->
+            Logger.error("Failed to create listed companies job: #{inspect(reason)}")
+            state
+        end
+
+      existing_job ->
+        # ジョブが既に存在する場合は更新
+        case Repo.update(Job.changeset(existing_job, %{
+          name: job.name,
+          description: job.description,
+          schedule: job.schedule,
+          is_enabled: job.is_enabled
+        })) do
+          {:ok, updated_job} ->
+            # ジョブの実行履歴を取得
+            executions = get_recent_executions([updated_job.id])
+            |> Enum.map(fn execution -> {execution.id, execution} end)
+            |> Map.new()
+
+            # 次の実行時刻を計算
+            next_run = calculate_next_run(updated_job.schedule)
+
+            %{state |
+              jobs: Map.put(state.jobs, updated_job.id, updated_job),
+              executions: executions,
+              next_runs: Map.put(state.next_runs, updated_job.id, next_run)
+            }
+
+          {:error, reason} ->
+            Logger.error("Failed to update listed companies job: #{inspect(reason)}")
+            state
         end
     end
   end
@@ -256,34 +273,26 @@ defmodule MooMarkets.Scheduler.Server do
 
       job ->
         if job.is_enabled do
-          # 実行中のジョブとしてマーク
-          new_state = %{state | running_jobs: Map.put(state.running_jobs, job_id, true)}
+          now = DateTime.utc_now() |> DateTime.truncate(:second)
+          # 実行中のジョブとしてマーク（開始時刻を保存）
+          new_state = %{state | running_jobs: Map.put(state.running_jobs, job_id, now)}
 
-          # ジョブ実行レコードを作成
-          execution = %JobExecution{
-            job_id: job_id,
-            started_at: DateTime.utc_now() |> DateTime.truncate(:second),
-            status: "running"
-          }
+          # GenServerプロセスのPIDを保持
+          server = self()
+          # job.job_typeの中身を確認
+          IO.inspect(job.job_type, label: "Job type before Task.start")
+          # ジョブを非同期で実行
+          Task.start(fn ->
+            try do
+              result = JobRunner.run_job(job.job_type)
+              Process.send(server, {:job_completed, job_id, result}, [])
+            catch
+              kind, error ->
+                Process.send(server, {:job_completed, job_id, {:error, {kind, error}}}, [])
+            end
+          end)
 
-          case Repo.insert(execution) do
-            {:ok, saved_execution} ->
-              # ジョブを非同期で実行
-              Task.start(fn ->
-                try do
-                  result = JobRunner.run_job(job.job_type)
-                  Process.send(self(), {:job_completed, job_id, result}, [])
-                catch
-                  kind, error ->
-                    Process.send(self(), {:job_completed, job_id, {:error, {kind, error}}}, [])
-                end
-              end)
-
-              {:ok, %{new_state | executions: Map.put(new_state.executions, saved_execution.id, saved_execution)}}
-
-            {:error, _} ->
-              {:error, :execution_creation_failed}
-          end
+          {:ok, new_state}
         else
           {:error, :job_disabled}
         end

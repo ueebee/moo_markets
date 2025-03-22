@@ -7,29 +7,45 @@ defmodule MooMarkets.Scheduler.JobRunner do
   alias MooMarkets.Scheduler.{Job, JobExecution}
   alias MooMarkets.Scheduler.Server
   import Ecto.Query
+  require Logger
 
   @doc """
   Runs a job of the specified type.
   Returns `:ok` on success or `{:error, reason}` on failure.
   """
   def run_job(job_type) do
-    job_module = job_module_from_type(job_type)
-    case get_job(job_type) do
-      {:error, reason} -> {:error, reason}
-      job ->
-        now = DateTime.utc_now() |> DateTime.truncate(:second)
+    IO.inspect(job_type, label: "JobRunner.run_job received job_type")
+    Logger.info("JobRunner.run_job started with job_type: #{job_type}")
+    case job_module_from_type(job_type) do
+      {:error, reason} ->
+        Logger.error("Failed to resolve job module: #{inspect(reason)}")
+        {:error, reason}
+      job_module when is_atom(job_module) ->
+        Logger.info("Resolved job_module: #{inspect(job_module)}")
 
-        # 実行中のジョブをチェック
-        if has_running_execution?(job.id) do
-          {:error, :job_already_running}
-        else
-          execution = create_execution(job.id, now)
-          result = execute_job_with_cleanup(job, job_module, execution, now)
-          # Serverに結果を通知
-          send(Server, {:job_completed, job.id, result})
-          # 実行結果を返す前に少し待つ
-          Process.sleep(100)
-          result
+        case get_job(job_type) do
+          {:error, reason} ->
+            Logger.error("Failed to get job: #{inspect(reason)}")
+            {:error, reason}
+          job ->
+            Logger.info("Found job: #{inspect(job)}")
+            now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+            # 実行中のジョブをチェック
+            if has_running_execution?(job.id) do
+              Logger.warn("Job #{job.id} is already running")
+              {:error, :job_already_running}
+            else
+              execution = create_execution(job.id, now)
+              Logger.info("Created execution record: #{inspect(execution)}")
+              result = execute_job_with_cleanup(job, job_module, execution, now)
+              # Serverに結果を通知
+              Logger.info("Sending result to server: #{inspect(result)}")
+              send(Server, {:job_completed, job.id, result})
+              # 実行結果を返す前に少し待つ
+              Process.sleep(100)
+              result
+            end
         end
     end
   end
@@ -61,13 +77,17 @@ defmodule MooMarkets.Scheduler.JobRunner do
   end
 
   defp execute_job_with_cleanup(job, job_module, execution, now) do
+    Logger.info("Starting execute_job_with_cleanup for job: #{inspect(job)}")
     try do
+      Logger.info("Calling #{inspect(job_module)}.perform()")
       result = job_module.perform()
+      Logger.info("Job execution completed with result: #{inspect(result)}")
       update_execution_status(execution, result, now)
       update_job_status(job, now)
       result
     catch
       kind, reason ->
+        Logger.error("Job execution failed with #{kind}: #{inspect(reason)}")
         error = %{kind: kind, reason: reason}
         update_execution_status(execution, {:error, error}, now)
         {:error, error}
