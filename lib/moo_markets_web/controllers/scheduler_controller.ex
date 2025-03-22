@@ -8,16 +8,23 @@ defmodule MooMarketsWeb.SchedulerController do
     render(conn, :status, state: state)
   end
 
-  def toggle_enabled(conn, %{"enabled" => enabled}) do
-    case Server.toggle_job(1, enabled) do
-      :ok ->
-        state = Server.get_state()
-        render(conn, :status, state: state)
+  def toggle_enabled(conn, %{"id" => id, "enabled" => enabled}) do
+    case Integer.parse(id) do
+      {job_id, ""} ->
+        case Server.toggle_job(job_id, enabled) do
+          :ok ->
+            state = Server.get_state()
+            render(conn, :status, state: state)
 
-      {:error, reason} ->
+          {:error, reason} ->
+            conn
+            |> put_status(:unprocessable_entity)
+            |> json(%{error: reason})
+        end
+      _ ->
         conn
-        |> put_status(:unprocessable_entity)
-        |> json(%{error: reason})
+        |> put_status(:bad_request)
+        |> json(%{error: "Invalid job ID"})
     end
   end
 

@@ -32,7 +32,7 @@ defmodule MooMarketsWeb.Router do
     get "/scheduler/status", SchedulerController, :get_status
     get "/scheduler/jobs", SchedulerController, :get_jobs
     get "/scheduler/jobs/:id", SchedulerController, :get_job
-    put "/scheduler/enabled", SchedulerController, :toggle_enabled
+    put "/scheduler/jobs/:id/enabled", SchedulerController, :toggle_enabled
     post "/scheduler/jobs/:id/run", SchedulerController, :run_job
     post "/scheduler/cleanup", SchedulerController, :cleanup
   end

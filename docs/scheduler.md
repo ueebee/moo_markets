@@ -85,17 +85,17 @@ lib/
 # スケジューラーの状態取得
 GET /api/scheduler/status
 
-# スケジューラーのON/OFF切り替え
-PUT /api/scheduler/enabled
-{
-  "enabled": true
-}
-
 # ジョブ一覧の取得
 GET /api/scheduler/jobs
 
 # ジョブの詳細取得
 GET /api/scheduler/jobs/:id
+
+# ジョブの有効/無効切り替え
+PUT /api/scheduler/jobs/:id/enabled
+{
+  "enabled": true
+}
 
 # ジョブの即時実行
 POST /api/scheduler/jobs/:id/run
@@ -310,12 +310,14 @@ UIのデザイン方針（既存のデザインシステムとの整合性）
 ✅ ジョブの有効/無効切り替え
 ✅ ジョブの実行履歴管理
 ✅ ジョブの実行状況確認
+✅ スケジュール解析と次回実行時刻計算の実装（Crontabを使用）
+
 未実装の項目：
 APIエンドポイント
-❌ GET /api/scheduler/status
-❌ PUT /api/scheduler/enabled
+✅ GET /api/scheduler/status
 ❌ GET /api/scheduler/jobs
 ❌ GET /api/scheduler/jobs/:id
+❌ PUT /api/scheduler/jobs/:id/enabled
 ❌ POST /api/scheduler/jobs/:id/run
 ❌ GET /api/scheduler/jobs/:id/executions
 フロントエンド実装
@@ -325,14 +327,12 @@ APIエンドポイント
 ❌ 実行履歴表示
 ❌ 操作UI
 その他の機能
-❌ スケジュール解析と次回実行時刻計算の実装
 ❌ エラー時のリトライ機能
 ❌ ジョブ実行状況の定期的な更新
+
 次のステップとして、以下のいずれかに進むことができます：
-APIエンドポイントの実装
-LiveViewを使用したフロントエンドの実装
-スケジュール解析と次回実行時刻計算の実装
-どの方向で進めるべきかご指示ください。
+1. APIエンドポイントの実装
+2. LiveViewを使用したフロントエンドの実装
 
 ---
 
